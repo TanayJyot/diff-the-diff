@@ -1,0 +1,21 @@
+# activation caches / model weights — never commit
+caches/
+artifacts/
+runs/
+*.npy
+*.memmap
+*.safetensors
+*.bin
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# local config / secrets
+.env
+.env.*
