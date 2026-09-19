@@ -37,12 +37,35 @@ to answer it cheaply — see [`docs/DESIGN.md`](docs/DESIGN.md) §11.
 
 ## Status
 
-Design stage. No implementation yet. Source paper read in full.
+**Phase 0 complete**: the harness runs, and the null test has a result.
+
+```bash
+pip install -e ".[dev]"
+pytest -q                                          # 50 tests
+python -m diffdiff.cli null    --seeds 0 1 2       # diff a model against itself
+python -m diffdiff.cli control --seeds 0 1 2       # positive control
+```
 
 | Document | Contents |
 |---|---|
+| [`docs/PHASE0-RESULTS.md`](docs/PHASE0-RESULTS.md) | What the null test found, and what it decides |
 | [`docs/DESIGN.md`](docs/DESIGN.md) | Architecture, ground-truth strategy, metrics, phase plan, kill criteria |
-| [`docs/RESEARCH-NOTES.md`](docs/RESEARCH-NOTES.md) | The literature this builds on, and what we could not verify |
+| [`docs/RESEARCH-NOTES.md`](docs/RESEARCH-NOTES.md) | The source paper, read in full, and what it does and does not establish |
+| [`docs/HANDOFF.md`](docs/HANDOFF.md) | Running the real-model path on a machine with a GPU and model-hub access |
+
+### What Phase 0 contains
+
+- `diffdiff/diffing/` — BatchTopK crosscoder and DFC (dedicated partitions with
+  structurally zeroed opposing decoders), with sparsity annealing and the AuxK
+  dead-feature loss.
+- `diffdiff/data/toy.py` — the paper's synthetic concept model (§2.3), extended
+  with a perfect-null regime and a quantization-like near-identical regime.
+- `diffdiff/validate/` — the null test and a mirror-pair detector, both scored
+  against controls.
+- `diffdiff/align/` — the paper's Algorithm 1 window-expansion aligner, for the
+  cross-architecture case later.
+- `diffdiff/models/`, `diffdiff/data/cache.py` — real-model loading,
+  quantization, hooked activation capture, and a memmap cache.
 
 ## Constraints that shape everything here
 

@@ -19,3 +19,6 @@ venv/
 # local config / secrets
 .env
 .env.*
+
+# phase 0 scratch
+paper.txt
