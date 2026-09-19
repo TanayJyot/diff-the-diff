@@ -93,3 +93,31 @@ def test_drop_offset_selects_different_concepts():
     gt_mid = ToyActivations(cfg_mid).ground_truth()
     assert not gt_low["visible_b"][0] and gt_low["visible_b"][64]
     assert gt_mid["visible_b"][0] and not gt_mid["visible_b"][64]
+
+
+def test_data_stream_is_independent_of_model_init_stream():
+    """Regression: the toy generator and model init must not draw the same
+    numbers.
+
+    Callers seed model init with torch.manual_seed(seed) while the toy used
+    torch.Generator().manual_seed(seed). Same algorithm, same seed, same
+    stream - so nn.init.normal_ on a decoder reproduced the concept matrix row
+    for row, leaving every decoder exactly parallel to a ground-truth concept
+    and silently invalidating every concept-matching metric.
+    """
+    import torch.nn as nn
+
+    seed, d, n = 0, 128, 272
+    src = ToyActivations(ToyConfig(d_a=d, d_b=d, n_shared=n, seed=seed))
+
+    torch.manual_seed(seed)
+    W = torch.empty(n, d)
+    nn.init.normal_(W)
+
+    Wn = W / W.norm(dim=-1, keepdim=True)
+    Cn = src.concepts_a / src.concepts_a.norm(dim=-1, keepdim=True)
+    max_cos = (Wn @ Cn.T).abs().max()
+    assert max_cos < 0.9, (
+        f"model init is parallel to ground-truth concepts (max |cos| = {max_cos:.4f}); "
+        "the data and init RNG streams have collided"
+    )

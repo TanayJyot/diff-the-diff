@@ -37,6 +37,11 @@ from dataclasses import dataclass, field
 import torch
 
 
+#: Added to every toy seed so the data stream cannot coincide with the stream
+#: used to initialise model weights. See :class:`ToyActivations`.
+_DATA_SEED_OFFSET = 0x5EED_0000
+
+
 @dataclass
 class ToyConfig:
     """Configuration for the synthetic concept model.
@@ -102,7 +107,14 @@ class ToyActivations:
     def __init__(self, config: ToyConfig, device: str | torch.device = "cpu"):
         self.config = config
         self.device = torch.device(device)
-        gen = torch.Generator(device="cpu").manual_seed(config.seed)
+        # Offset the data stream away from the model's. Callers seed model
+        # initialisation with `torch.manual_seed(seed)`, which uses the same
+        # generator algorithm; with the same integer seed both draw the SAME
+        # numbers, so `nn.init.normal_` on a decoder reproduces the concept
+        # matrix row for row and every decoder starts out exactly parallel to a
+        # ground-truth concept. That silently invalidates any concept-matching
+        # metric. The offset makes the two streams independent in practice.
+        gen = torch.Generator(device="cpu").manual_seed(config.seed + _DATA_SEED_OFFSET)
         self._gen = gen
 
         n = config.n_concepts
