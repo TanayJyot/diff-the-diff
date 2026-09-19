@@ -128,16 +128,28 @@ anything exclusive exists. So the null test measures the false-discovery floor
 directly, and every downstream finding must be discounted by it. **We run this
 first, before anything else, and report it in every experiment.**
 
-**The null must be run in both capacity regimes, because they have different
-incentives.** When the dictionary is *overcomplete* relative to the number of
-concepts in the data, the shared partition alone has enough capacity to explain
-everything, so the optimizer can simply leave the exclusive partitions dead — a
-clean null that may say more about spare capacity than about the method. When
-the dictionary is *undercomplete*, shared capacity is scarce and there is real
-pressure to recruit exclusive features, which is exactly when mirroring should
-appear. The paper notes the undercomplete regime "is most likely the regime in
-which real-world applications operate", and it is unavoidably ours on 8GB, so a
-null that passes only when overcomplete is not a result we can rely on.
+**The null must be run in both capacity regimes, because they behave
+differently — though not in the direction we first predicted.**
+
+The original prediction recorded here was that an *overcomplete* dictionary
+would leave the exclusive partitions dead (spare capacity, no pressure to use
+them), while an *undercomplete* one would be under pressure to recruit them.
+**Phase 0 measured the opposite** (see `PHASE0-RESULTS.md`): overcomplete gives
+roughly twice the false-discovery floor of undercomplete, landing near the
+uniform share.
+
+The mechanism runs the other way. When capacity is scarce, a shared feature is
+a better bargain — it reconstructs *both* models per slot spent — so the
+optimizer economises by avoiding the exclusive partitions. When capacity is
+abundant there is no such pressure, and the partitions fill to roughly their
+proportional share because nothing discourages it. Scarcity suppresses the
+artifact rather than causing it.
+
+The practical consequence is that **dictionary size is a false-discovery knob**,
+not just a capacity choice, and an oversized dictionary is actively harmful for
+diffing. The undercomplete regime — which the paper notes "is most likely the
+regime in which real-world applications operate", and which is unavoidably ours
+on 8GB — is the better-behaved one.
 
 **A null result is meaningless without a positive control.** If the exclusive
 partitions also stay empty in a regime where differences genuinely exist, then
