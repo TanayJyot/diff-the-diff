@@ -128,6 +128,23 @@ anything exclusive exists. So the null test measures the false-discovery floor
 directly, and every downstream finding must be discounted by it. **We run this
 first, before anything else, and report it in every experiment.**
 
+**The null must be run in both capacity regimes, because they have different
+incentives.** When the dictionary is *overcomplete* relative to the number of
+concepts in the data, the shared partition alone has enough capacity to explain
+everything, so the optimizer can simply leave the exclusive partitions dead — a
+clean null that may say more about spare capacity than about the method. When
+the dictionary is *undercomplete*, shared capacity is scarce and there is real
+pressure to recruit exclusive features, which is exactly when mirroring should
+appear. The paper notes the undercomplete regime "is most likely the regime in
+which real-world applications operate", and it is unavoidably ours on 8GB, so a
+null that passes only when overcomplete is not a result we can rely on.
+
+**A null result is meaningless without a positive control.** If the exclusive
+partitions also stay empty in a regime where differences genuinely exist, then
+the method is not finding anything at this scale and a clean null is vacuous
+rather than reassuring. `diffdiff.cli control` runs the same measurement code on
+a regime with planted exclusive concepts, for exactly this reason.
+
 ### 6.2 Monotonicity
 The magnitude of the discovered diff should be ordered by how destructive the
 transformation was:

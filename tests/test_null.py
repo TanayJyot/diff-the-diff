@@ -141,3 +141,24 @@ def test_regime_test_allows_non_null():
         compare_standard=False,
     )
     assert report.verdict()
+
+
+def test_mirror_control_pools_match_candidate_counts():
+    """The control's max is over the same number of candidates as the real
+    test, since a maximum grows with pool size."""
+    cfg = CrosscoderConfig(d_a=16, d_b=16, n_features=512, exclusive_frac=0.05, k=4)
+    model = Crosscoder(cfg)
+    feats = torch.rand(256, 512)
+    report = find_mirror_pairs(model, feats)
+    assert report.control_matched, "shared partition is large enough here"
+
+
+def test_mirror_control_flags_undersized_pool():
+    """A shared partition too small for matched pools must be flagged, not
+    silently produce an optimistic excess."""
+    cfg = CrosscoderConfig(d_a=16, d_b=16, n_features=100, exclusive_frac=0.4, k=4)
+    model = Crosscoder(cfg)
+    feats = torch.rand(128, 100)
+    report = find_mirror_pairs(model, feats)
+    assert not report.control_matched
+    assert "[control pool undersized]" in report.summary()

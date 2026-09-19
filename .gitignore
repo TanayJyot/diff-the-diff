@@ -1,7 +1,10 @@
 # activation caches / model weights — never commit
 caches/
 artifacts/
-runs/
+
+# run outputs: keep the result JSONs, drop the rest
+runs/*
+!runs/*.json
 *.npy
 *.memmap
 *.safetensors

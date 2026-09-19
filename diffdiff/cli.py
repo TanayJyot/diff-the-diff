@@ -26,6 +26,10 @@ def _add_null_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--exclusive-frac", type=float, default=0.05,
                    help="fraction of the dictionary dedicated to EACH exclusive partition")
     p.add_argument("--k", type=int, default=16, help="final BatchTopK sparsity")
+    p.add_argument("--aux-alpha", type=float, default=0.03,
+                   help="weight of the AuxK dead-feature loss. Set 0 to disable: the "
+                        "loss revives features that stopped firing, so it may itself "
+                        "be what populates an exclusive partition that should be empty")
     p.add_argument("--steps", type=int, default=2000)
     p.add_argument("--batch-size", type=int, default=512)
     p.add_argument("--lr", type=float, default=1e-4)
@@ -66,6 +70,7 @@ def _run_regime(args: argparse.Namespace) -> int:
                 d_a=args.d, d_b=args.d, n_features=args.features,
                 exclusive_frac=args.exclusive_frac, k=args.k, k_initial=args.k * 4,
                 anneal_steps=min(5000, args.steps // 4),
+                aux_alpha=args.aux_alpha,
             ),
             training=TrainConfig(
                 steps=args.steps, batch_size=args.batch_size, lr=args.lr,
@@ -111,6 +116,10 @@ def _run_regime(args: argparse.Namespace) -> int:
                 "fve_a": r.fve_a,
                 "fve_b": r.fve_b,
                 "l0": r.l0,
+                "aux_alpha": args.aux_alpha,
+                "n_features": args.features,
+                "n_concepts": args.concepts,
+                "exclusive_frac": args.exclusive_frac,
             }
             for r in reports
         ]

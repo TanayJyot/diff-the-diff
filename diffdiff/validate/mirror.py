@@ -53,6 +53,10 @@ class MirrorReport:
         control_median: Median best-partner correlation in the control.
         median_decoder_cos: Median decoder cosine among matched pairs, or
             ``None`` when the two decoder spaces are not comparable.
+        control_matched: Whether the control used candidate pools of the same
+            size as the real comparison. When the shared partition is too small
+            to supply them, the control is weaker than the real test and
+            ``excess`` understates the mirroring.
         n_live_a: Live features in ``I_A``.
         n_live_b: Live features in ``I_B``.
         threshold: Correlation threshold used.
@@ -70,14 +74,16 @@ class MirrorReport:
     n_live_b: int
     threshold: float
     pairs: list[tuple[int, int, float]]
+    control_matched: bool = True
 
     def summary(self) -> str:
         cos = "n/a" if self.median_decoder_cos is None else f"{self.median_decoder_cos:.3f}"
+        warn = "" if self.control_matched else " [control pool undersized]"
         return (
             f"mirror_frac={self.mirror_frac:.3f} control={self.control_frac:.3f} "
             f"excess={self.excess:+.3f} median_corr={self.median_score:.3f} "
             f"(control {self.control_median:.3f}) decoder_cos={cos} "
-            f"live A/B={self.n_live_a}/{self.n_live_b}"
+            f"live A/B={self.n_live_a}/{self.n_live_b}{warn}"
         )
 
 
@@ -148,22 +154,33 @@ def find_mirror_pairs(
             mirror_frac=0.0, control_frac=0.0, excess=0.0,
             median_score=0.0, control_median=0.0, median_decoder_cos=None,
             n_live_a=len(live_a), n_live_b=len(live_b),
-            threshold=threshold, pairs=[],
+            threshold=threshold, pairs=[], control_matched=True,
         )
 
     scores, partners = _best_partner(std_feats[:, live_a], std_feats[:, live_b])
 
-    # Control: two random halves of the shared partition. Shared features are
-    # not duplicates of each other, so this measures how large a maximum over
-    # this many candidates gets by chance.
+    # Control: two disjoint random subsets of the shared partition. Shared
+    # features are not duplicates of each other, so this measures how large a
+    # maximum over this many candidates gets by chance. The pools must be the
+    # same sizes as the real comparison, because the statistic is a maximum and
+    # therefore grows with the number of candidates.
+    n_l, n_r = len(live_a), len(live_b)
     gen = torch.Generator().manual_seed(seed)
     perm = live_s[torch.randperm(len(live_s), generator=gen)]
-    half = min(len(live_a), len(perm) // 2)
-    if half > 0:
-        ctrl_l, ctrl_r = perm[:half], perm[half : half + max(half, len(live_b))]
+    control_matched = len(perm) >= n_l + n_r
+    if control_matched:
+        ctrl_l, ctrl_r = perm[:n_l], perm[n_l : n_l + n_r]
+    else:
+        # Not enough shared features for matched pools. Split proportionally and
+        # flag it: the control is then over fewer candidates than the real test,
+        # so it scores lower and `excess` understates the mirroring.
+        split = max(1, int(len(perm) * n_l / max(1, n_l + n_r)))
+        ctrl_l, ctrl_r = perm[:split], perm[split:]
+    if len(ctrl_l) and len(ctrl_r):
         ctrl_scores, _ = _best_partner(std_feats[:, ctrl_l], std_feats[:, ctrl_r])
     else:
         ctrl_scores = torch.zeros(1)
+        control_matched = False
 
     above = scores >= threshold
     mirror_frac = float(above.float().mean())
@@ -202,4 +219,5 @@ def find_mirror_pairs(
         n_live_b=len(live_b),
         threshold=threshold,
         pairs=pairs,
+        control_matched=control_matched,
     )
