@@ -227,6 +227,52 @@ class Crosscoder(nn.Module):
         norms_b[self.slice_b] = self.W_dec_b.detach().norm(dim=-1)
         return norms_a, norms_b
 
+    def full_decoder(self, model: str) -> torch.Tensor:
+        """Decoder matrix over the *whole* dictionary, zero-padded.
+
+        A DFC's decoders span only their own partition, so their row indices do
+        not line up with feature indices. This returns a
+        ``(n_features, d_model)`` matrix indexed by feature, with exact zeros
+        for features that do not reconstruct this model — which lets callers
+        index by feature id without tracking partition offsets.
+
+        Args:
+            model: ``"a"`` or ``"b"``.
+        """
+        cfg = self.config
+        if model == "a":
+            W, sl, d = self.W_dec_a, self.slice_a, cfg.d_a
+        elif model == "b":
+            W, sl, d = self.W_dec_b, self.slice_b, cfg.d_b
+        else:
+            raise ValueError(f"model must be 'a' or 'b', got {model!r}")
+        full = torch.zeros(cfg.n_features, d, device=W.device, dtype=W.dtype)
+        full[sl] = W.detach()
+        return full
+
+    def exclusive_mask(self, model: str) -> torch.Tensor:
+        """Which features this architecture labels exclusive to ``model``.
+
+        For a DFC this is the dedicated partition. For a standard crosscoder
+        there is no partition, so we take the features with the most extreme
+        relative decoder norm, budgeted to the *same count* a DFC would
+        allocate — the comparison the paper makes when it takes the 500 most
+        extreme features. Without matching the budget, recall and
+        false-positive rates would not be comparable across architectures.
+        """
+        cfg = self.config
+        if cfg.is_dfc:
+            return self.partition_mask("A" if model == "a" else "B")
+
+        budget = max(1, int(cfg.n_features * 0.05))
+        rel = self.relative_decoder_norm()
+        # R ~ 1 means A-exclusive, R ~ 0 means B-exclusive.
+        scores = rel if model == "a" else -rel
+        idx = torch.topk(scores, budget).indices
+        mask = torch.zeros(cfg.n_features, dtype=torch.bool, device=rel.device)
+        mask[idx] = True
+        return mask
+
     def relative_decoder_norm(self, eps: float = 1e-8) -> torch.Tensor:
         """``R_i = ||d_i^A|| / (||d_i^A|| + ||d_i^B||)``, the standard crosscoder's
         post-hoc exclusivity measure. ``R_i ~ 1`` means A-exclusive, ``~0`` means

@@ -13,6 +13,7 @@ import sys
 from diffdiff.data.toy import cross_arch_config, null_config, quantized_config
 from diffdiff.diffing.crosscoder import CrosscoderConfig
 from diffdiff.diffing.train import TrainConfig
+from diffdiff.validate.compare import run_comparison
 from diffdiff.validate.null import NullReport, run_control_test, run_null_test
 
 
@@ -134,6 +135,65 @@ def _run_regime(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_compare(args: argparse.Namespace) -> int:
+    """DFC vs standard crosscoder on a cross-architecture diff, scored against
+    ground truth."""
+    import json as _json
+
+    rows = []
+    for seed in args.seeds:
+        if not args.quiet:
+            print(f"\n=== comparison, seed {seed} ===", flush=True)
+        reports = run_comparison(
+            toy=cross_arch_config(
+                d_a=args.d_a, d_b=args.d_b,
+                n_shared=args.concepts - args.n_excl, n_excl=args.n_excl, seed=seed,
+            ),
+            crosscoder=CrosscoderConfig(
+                d_a=args.d_a, d_b=args.d_b, n_features=args.features,
+                exclusive_frac=args.exclusive_frac, k=args.k, k_initial=args.k * 4,
+                anneal_steps=min(5000, args.steps // 4), aux_alpha=args.aux_alpha,
+            ),
+            training=TrainConfig(
+                steps=args.steps, batch_size=args.batch_size, lr=args.lr,
+                device=args.device, seed=seed,
+            ),
+            threshold=args.threshold,
+            seed=seed,
+            progress=None if args.quiet else lambda m: print(m, flush=True),
+        )
+        for r in reports:
+            if args.quiet:
+                print(r.summary(), flush=True)
+            rows.append({
+                "seed": seed, "architecture": r.architecture,
+                "recall": r.mean_recall, "precision": r.mean_precision,
+                "f1": r.mean_f1, "shared_leakage": r.mean_leakage,
+                "unmatched_a": r.report_a.unmatched, "unmatched_b": r.report_b.unmatched,
+                "n_true_a": r.report_a.n_true, "n_labelled_a": r.report_a.n_labelled,
+                "fve_a": r.fve_a, "fve_b": r.fve_b,
+                "n_features": args.features, "n_excl": args.n_excl,
+                "threshold": args.threshold,
+            })
+
+    print("\n=== summary across seeds ===")
+    for arch in ("dfc", "standard"):
+        sel = [r for r in rows if r["architecture"] == arch]
+        if not sel:
+            continue
+        n = len(sel)
+        print(f"  {arch:>8s}: recall={sum(r['recall'] for r in sel)/n:.3f} "
+              f"precision={sum(r['precision'] for r in sel)/n:.3f} "
+              f"f1={sum(r['f1'] for r in sel)/n:.3f} "
+              f"leakage={sum(r['shared_leakage'] for r in sel)/n:.3f}")
+
+    if args.json:
+        with open(args.json, "w") as fh:
+            _json.dump(rows, fh, indent=2)
+        print(f"  wrote {args.json}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="diffdiff", description="Model diffing harness (Phase 0: null test)"
@@ -165,6 +225,33 @@ def main(argv: list[str] | None = None) -> int:
                               "yields an optimistic detection limit; a larger offset "
                               "destroys rarer, harder-to-detect ones")
     control.set_defaults(func=_run_regime)
+
+    comp = sub.add_parser(
+        "compare",
+        help="DFC vs standard crosscoder on a cross-architecture diff, scored "
+             "against ground-truth concepts with a matched exclusive budget",
+    )
+    comp.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2])
+    comp.add_argument("--d-a", type=int, default=128, help="model A activation dim")
+    comp.add_argument("--d-b", type=int, default=96,
+                      help="model B activation dim; differing from --d-a is what "
+                           "makes this cross-architecture")
+    comp.add_argument("--concepts", type=int, default=256)
+    comp.add_argument("--n-excl", type=int, default=16,
+                      help="ground-truth concepts exclusive to EACH model")
+    comp.add_argument("--features", type=int, default=4096)
+    comp.add_argument("--exclusive-frac", type=float, default=0.05)
+    comp.add_argument("--k", type=int, default=16)
+    comp.add_argument("--aux-alpha", type=float, default=0.03)
+    comp.add_argument("--steps", type=int, default=1500)
+    comp.add_argument("--batch-size", type=int, default=512)
+    comp.add_argument("--lr", type=float, default=1e-3)
+    comp.add_argument("--threshold", type=float, default=0.5,
+                      help="cosine similarity for a feature-concept match")
+    comp.add_argument("--device", default="cpu")
+    comp.add_argument("--json", metavar="PATH")
+    comp.add_argument("--quiet", action="store_true")
+    comp.set_defaults(func=_run_compare)
 
     args = parser.parse_args(argv)
     return args.func(args)
