@@ -1,3 +1,14 @@
+# SUPERSEDED — retained for the record only
+
+Every number below was produced before the RNG collision fix and is wrong.
+See [`RESULTS.md`](RESULTS.md) for corrected data and
+[`CORRECTIONS.md`](CORRECTIONS.md) for what changed and why.
+
+This file is kept so the retracted claims stay visible rather than being
+quietly overwritten.
+
+---
+
 # Phase 0 results: the null test
 
 > **UNDER REVISION — do not cite §3, §4, §6 or §7 below.**
