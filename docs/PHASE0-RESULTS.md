@@ -187,3 +187,119 @@ honest move is to pivot to the cross-architecture use case, where differences
 are large and the method demonstrably works — and to report the detection limit
 as the finding, since the paper reports no null test and therefore has no
 measured floor to compare against.
+
+
+---
+
+# Phase 0.5: the sensitivity sweep
+
+## 5. What was run
+
+Phase 0 established that the method discriminates *only* when the dictionary is
+overcomplete, and only measured that at one damage level (16 of 256 concepts
+destroyed, ~6%). That level is far cruder than real quantization damage, so the
+open question was: **how small can the damage get before it becomes invisible?**
+
+The sweep holds everything fixed — 4096 features, 3 seeds, identity transform,
+2% noise — and varies only the number of concepts destroyed in model B. The
+fixed baseline is `null_overcomplete`: **0.0740, range 0.0649 – 0.0798**.
+
+A point counts as detectable only if its per-seed *minimum* clears the null's
+*maximum* (0.0798). Comparing means alone would let an overlapping distribution
+pass.
+
+## 6. The sensitivity curve
+
+| Destroyed | % of concepts | mean | range | vs null | Detectable |
+|---|---|---|---|---|---|
+| 16 (most active) | 6.3% | 0.1129 | 0.1020 – 0.1294 | **+52.6%** | **yes** |
+| 8 | 3.1% | 0.0803 | 0.0674 – 0.0956 | +8.6% | no |
+| 4 | 1.6% | 0.0689 | 0.0531 – 0.0770 | −6.8% | no |
+| 2 | 0.8% | 0.0742 | 0.0634 – 0.0852 | +0.4% | no |
+| 1 | 0.4% | 0.0768 | 0.0611 – 0.0910 | +3.8% | no |
+
+**The detection limit sits between 3.1% and 6.3% of all concepts destroyed
+outright**, and it is a cliff rather than a slope: halving the damage from 16 to
+8 concepts collapsed the signal from +52.6% to +8.6% with full range overlap.
+
+Below n=8 the readings are **flat noise**. They scatter around the null in both
+directions (−6.8%, +0.4%, +3.8%) with no monotone relationship to the amount of
+damage. At n=4 the control read *lower* than destroying nothing at all. The sign
+of the difference carries no information at these levels.
+
+### 6.1 These numbers are the optimistic case
+
+Concept frequency in the toy model follows a power law in the concept index, and
+every point above destroys concepts starting at index 0 — the **most active**
+concepts in the data, the easiest possible targets. `sweep_n16_mid` repeats the
+one detectable point with the same count at mid-frequency (offset 120) to
+measure how much that choice was carrying the result.
+
+_(That run is the last outstanding item; the table is updated when it lands. It
+can only move the limit in the unfavourable direction: if mid-frequency damage
+at n=16 fails to separate, the true limit is worse than 6.3%.)_
+
+## 7. What this means for the quantization use case
+
+Int4 quantization does not delete several percent of a model's concepts. It
+perturbs every weight slightly and degrades some features partially. The damage
+this use case exists to detect is **orders of magnitude below the measured
+detection limit**.
+
+This triggers a kill criterion, though not one of the three written down in
+`DESIGN.md` §12. Those anticipated the method producing *false positives* —
+§11's mirror-features concern. It does produce them (a 7.4% floor on identical
+inputs), but the disqualifying problem is **sensitivity**: the method cannot see
+damage of the size we care about, whatever its floor.
+
+Two secondary findings reinforce this:
+
+- **The standard crosscoder reports nothing exclusive** (`standard_extreme_frac
+  = 0.0`) on identical inputs, where the DFC populates every exclusive slot. In
+  the near-identical regime the architectural fix is worse than its baseline.
+- **Discrimination requires an overcomplete dictionary**, which is the expensive
+  axis on 8GB and the one that drives the auto-interp bill, since the paper's
+  ~500,000 Claude queries per experiment scale with dictionary size.
+
+## 8. Recommendation
+
+**Stop work on quantization and merge verification. Pivot to the
+cross-architecture use case.**
+
+The evidence for the pivot target is already in hand: our own cross-architecture
+control separated at **3.16×** (0.2335 vs the 0.0740 null) with a wide
+non-overlapping gap — the single strongest separation anywhere in these runs.
+That matches the paper's own findings, which are all cross-architecture
+(Llama-vs-Qwen, GPT-OSS-vs-DeepSeek), and it is the setting the method was built
+for. Differences between independently trained models are large; differences
+introduced by rounding are not.
+
+Concretely, that means **vendor-migration risk** and **open-weight adoption
+diligence** (`README.md` options B and A), both of which need weights for two
+models — which an enterprise evaluating open-weight models has.
+
+**What carries over, and it is most of the work.** The harness is regime-agnostic:
+the crosscoder and DFC, the training loop, the memmap cache, the toy generator,
+the mirror detector, and the CLI all apply unchanged. `align/` already contains
+the paper's Algorithm 1 window-expansion aligner for the cross-tokenizer case,
+tested against the paper's own `['1989']` example. The pivot is a change of
+target, not a rewrite.
+
+**What we should publish either way.** The null test and the sensitivity curve
+are a genuine contribution. The paper reports no null test, so it has no measured
+false-discovery floor and no sensitivity curve — which means there is currently
+no published answer to "how large must a difference be before this method can see
+it?" Our answer, at toy scale, is ~5% of concepts destroyed outright. That is
+decision-useful for anyone considering model diffing for a near-identical
+comparison, and it is cheap to reproduce.
+
+**Revised priority order:**
+
+1. **Re-run the null and sensitivity sweep on real models** (`docs/HANDOFF.md`
+   step 2), to check whether the toy geometry transfers. This is the main risk
+   to the conclusion above.
+2. **The LLM black-box baseline** (Phase 1), unchanged in importance. It remains
+   the control that decides whether white-box access is worth its cost, and the
+   paper does not compare against it.
+3. **Cross-architecture diffing** as the new primary target, with the null test
+   retained as a standing check rather than a one-off.
