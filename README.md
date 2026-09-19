@@ -48,7 +48,8 @@ python -m diffdiff.cli control --seeds 0 1 2       # positive control
 
 | Document | Contents |
 |---|---|
-| [`docs/PHASE0-RESULTS.md`](docs/PHASE0-RESULTS.md) | What the null test found, and what it decides |
+| [`docs/RESULTS.md`](docs/RESULTS.md) | Corrected results and the current recommendation |
+| [`docs/CORRECTIONS.md`](docs/CORRECTIONS.md) | Conclusions reported and later found wrong, and why |
 | [`docs/DESIGN.md`](docs/DESIGN.md) | Architecture, ground-truth strategy, metrics, phase plan, kill criteria |
 | [`docs/RESEARCH-NOTES.md`](docs/RESEARCH-NOTES.md) | The source paper, read in full, and what it does and does not establish |
 | [`docs/HANDOFF.md`](docs/HANDOFF.md) | Running the real-model path on a machine with a GPU and model-hub access |
