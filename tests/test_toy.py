@@ -76,3 +76,20 @@ def test_activations_are_sparse_combinations():
     src = ToyActivations(cfg)
     x_a, _ = src.sample_activations(256)
     assert x_a.norm(dim=-1).median() > 0, "activations should not be degenerate"
+
+
+def test_dropped_concept_frequency_depends_on_index():
+    """Concept frequency follows a power law in the index, so which concepts
+    are destroyed changes how detectable the damage is."""
+    src = ToyActivations(null_config(d=32, n_shared=128))
+    freqs = src.freqs
+    assert freqs[0] > freqs[64] > freqs[127], "frequency must decay with index"
+
+
+def test_drop_offset_selects_different_concepts():
+    cfg_low = quantized_config(d=32, n_shared=128, drop_concepts=(0, 1))
+    cfg_mid = quantized_config(d=32, n_shared=128, drop_concepts=(64, 65))
+    gt_low = ToyActivations(cfg_low).ground_truth()
+    gt_mid = ToyActivations(cfg_mid).ground_truth()
+    assert not gt_low["visible_b"][0] and gt_low["visible_b"][64]
+    assert gt_mid["visible_b"][0] and not gt_mid["visible_b"][64]

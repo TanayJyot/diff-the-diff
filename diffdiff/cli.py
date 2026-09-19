@@ -51,9 +51,10 @@ def _toy_for(args: argparse.Namespace, seed: int):
             d_a=args.d, d_b=args.d, n_shared=args.concepts - args.n_excl,
             n_excl=args.n_excl, seed=seed,
         )
+    offset = getattr(args, "drop_offset", 0)
     return quantized_config(
         d=args.d, n_shared=args.concepts, noise_std=args.noise,
-        drop_concepts=tuple(range(args.n_excl)), seed=seed,
+        drop_concepts=tuple(range(offset, offset + args.n_excl)), seed=seed,
     )
 
 
@@ -120,6 +121,9 @@ def _run_regime(args: argparse.Namespace) -> int:
                 "n_features": args.features,
                 "n_concepts": args.concepts,
                 "exclusive_frac": args.exclusive_frac,
+                "n_excl": getattr(args, "n_excl", None),
+                "drop_offset": getattr(args, "drop_offset", None),
+                "regime": getattr(args, "regime", None),
             }
             for r in reports
         ]
@@ -154,6 +158,12 @@ def main(argv: list[str] | None = None) -> int:
                          help="number of exclusive (or dropped) ground-truth concepts")
     control.add_argument("--noise", type=float, default=0.02,
                          help="quantization-like noise, for the 'dropped' regime")
+    control.add_argument("--drop-offset", type=int, default=0,
+                         help="index of the first concept destroyed in the 'dropped' "
+                              "regime. Concept frequency follows a power law in the "
+                              "index, so offset 0 destroys the MOST active concepts and "
+                              "yields an optimistic detection limit; a larger offset "
+                              "destroys rarer, harder-to-detect ones")
     control.set_defaults(func=_run_regime)
 
     args = parser.parse_args(argv)
