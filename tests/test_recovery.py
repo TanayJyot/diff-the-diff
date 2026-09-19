@@ -103,3 +103,56 @@ def test_null_has_no_true_exclusive_concepts():
     r = concept_recovery(model, src, which="a")
     assert r.n_true == 0
     assert r.recall == 0.0
+
+
+def test_precision_leakage_and_unmatched_are_exhaustive():
+    """Every labelled feature must fall into exactly one bucket. Before the
+    visibility mask, features matching concepts invisible to the scored model
+    fell into none of them and were silently dropped."""
+    src, model = make()
+    r = concept_recovery(model, src, which="a")
+    total = r.precision + r.shared_leakage + r.unmatched
+    assert total == pytest.approx(1.0, abs=1e-5)
+
+
+def test_concepts_invisible_to_scored_model_are_not_matchable():
+    """A B-exclusive concept has a direction in A's space but never appears in
+    A's activations, so matching it must not count as a hit."""
+    d = 32
+    src = ToyActivations(cross_arch_config(d_a=d, d_b=d, n_shared=48, n_excl=8))
+    model = Crosscoder(CrosscoderConfig(d_a=d, d_b=d, n_features=200,
+                                        exclusive_frac=0.05, k=4))
+    gt = src.ground_truth()
+    b_only = (gt["visible_b"] & ~gt["visible_a"]).nonzero(as_tuple=True)[0]
+    lo, hi = model.idx_excl_a
+    with torch.no_grad():
+        for slot, concept in enumerate(b_only[: hi - lo]):
+            model.W_dec_a[lo + slot] = src.concepts_a[concept]
+
+    r = concept_recovery(model, src, which="a", threshold=0.9)
+    assert r.precision == 0.0, "B-exclusive concepts are not A-exclusive hits"
+    assert r.unmatched == pytest.approx(1.0), "and they must count as unmatched"
+
+
+def test_precision_ceiling_reported():
+    """Raw precision is bounded by n_true/n_labelled and is uninterpretable
+    without it."""
+    src, model = make(n_excl=8, n_features=200)
+    r = concept_recovery(model, src, which="a")
+    assert r.precision_ceiling == pytest.approx(8 / 10)
+    assert 0.0 <= r.precision_normalized <= 1.0
+
+
+def test_precision_normalized_reaches_one_when_saturated():
+    d = 32
+    src = ToyActivations(cross_arch_config(d_a=d, d_b=d, n_shared=48, n_excl=16))
+    model = Crosscoder(CrosscoderConfig(d_a=d, d_b=d, n_features=200,
+                                        exclusive_frac=0.05, k=4))
+    gt = src.ground_truth()
+    true_excl = (gt["visible_a"] & ~gt["visible_b"]).nonzero(as_tuple=True)[0]
+    lo, hi = model.idx_excl_a
+    with torch.no_grad():
+        for slot in range(hi - lo):
+            model.W_dec_a[lo + slot] = src.concepts_a[true_excl[slot]]
+    r = concept_recovery(model, src, which="a", threshold=0.9)
+    assert r.precision_normalized == pytest.approx(1.0, abs=1e-3)

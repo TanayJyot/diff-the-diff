@@ -51,14 +51,23 @@ class ComparisonReport:
         return 0.5 * (self.report_a.f1 + self.report_b.f1)
 
     @property
+    def mean_precision_norm(self) -> float:
+        """Precision as a fraction of its ceiling — the comparable number."""
+        return 0.5 * (
+            self.report_a.precision_normalized + self.report_b.precision_normalized
+        )
+
+    @property
     def mean_leakage(self) -> float:
         return 0.5 * (self.report_a.shared_leakage + self.report_b.shared_leakage)
 
     def summary(self) -> str:
         return (
             f"{self.architecture:>8s} seed={self.seed} "
-            f"recall={self.mean_recall:.3f} precision={self.mean_precision:.3f} "
-            f"f1={self.mean_f1:.3f} leakage={self.mean_leakage:.3f} "
+            f"recall={self.mean_recall:.3f} "
+            f"prec_norm={self.mean_precision_norm:.3f} "
+            f"leakage={self.mean_leakage:.3f} unmatched="
+            f"{0.5 * (self.report_a.unmatched + self.report_b.unmatched):.3f} "
             f"fve={0.5 * (self.fve_a + self.fve_b):.3f}"
         )
 

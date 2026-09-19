@@ -50,6 +50,13 @@ class RecoveryReport:
             ground-truth concept at all above threshold.
         n_true: Number of genuinely exclusive concepts.
         n_labelled: Number of features labelled exclusive (budget-matched).
+        precision_ceiling: ``n_true / n_labelled`` — the highest precision
+            achievable given the budget. The exclusive budget is a fixed
+            fraction of the dictionary and is normally far larger than the
+            number of exclusive concepts, so raw precision is not interpretable
+            without it.
+        precision_normalized: ``precision / precision_ceiling``, in [0, 1].
+            This is the comparable number across configurations.
         threshold: Cosine similarity required to call a feature-concept match.
         best_cos_median: Median best-match cosine among labelled features, a
             read on whether matches are crisp or marginal.
@@ -63,15 +70,18 @@ class RecoveryReport:
     unmatched: float
     n_true: int
     n_labelled: int
+    precision_ceiling: float
+    precision_normalized: float
     threshold: float
     best_cos_median: float
 
     def summary(self) -> str:
         return (
-            f"[{self.model}] recall={self.recall:.3f} precision={self.precision:.3f} "
-            f"f1={self.f1:.3f} | shared_leakage={self.shared_leakage:.3f} "
-            f"unmatched={self.unmatched:.3f} | true={self.n_true} "
-            f"labelled={self.n_labelled} med_cos={self.best_cos_median:.3f}"
+            f"[{self.model}] recall={self.recall:.3f} "
+            f"precision={self.precision:.4f} ({self.precision_normalized:.3f} of "
+            f"ceiling {self.precision_ceiling:.4f}) | "
+            f"leakage={self.shared_leakage:.3f} unmatched={self.unmatched:.3f} | "
+            f"true={self.n_true} labelled={self.n_labelled}"
         )
 
 
@@ -122,12 +132,20 @@ def concept_recovery(
     labelled = model.exclusive_mask(which).cpu()
 
     cos = _cosine_matrix(decoders, concepts)
+    # Only concepts this model can actually see are legitimate matches. A
+    # concept exclusive to the *other* model still has a direction in this
+    # model's space, but it never appears in this model's activations, so a
+    # feature "matching" it is spurious. Masking these out keeps precision,
+    # leakage and unmatched exhaustive over the labelled features.
+    cos = cos.masked_fill(~visible_here.unsqueeze(0), -1.0)
     best_cos, best_concept = cos.max(dim=-1)
 
     n_true = int(true_exclusive.sum())
     n_labelled = int(labelled.sum())
+    ceiling = min(1.0, n_true / n_labelled) if n_labelled else 0.0
     if n_labelled == 0:
-        return RecoveryReport(which, 0.0, 0.0, 0.0, 0.0, 0.0, n_true, 0, threshold, 0.0)
+        return RecoveryReport(which, 0.0, 0.0, 0.0, 0.0, 0.0, n_true, 0, 0.0, 0.0,
+                              threshold, 0.0)
 
     # Precision side: what did the labelled features turn out to be?
     lab_idx = labelled.nonzero(as_tuple=True)[0]
@@ -162,6 +180,8 @@ def concept_recovery(
         unmatched=unmatched,
         n_true=n_true,
         n_labelled=n_labelled,
+        precision_ceiling=ceiling,
+        precision_normalized=(precision / ceiling) if ceiling > 0 else 0.0,
         threshold=threshold,
         best_cos_median=float(lab_cos.median()),
     )

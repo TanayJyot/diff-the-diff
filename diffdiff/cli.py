@@ -169,6 +169,8 @@ def _run_compare(args: argparse.Namespace) -> int:
                 "seed": seed, "architecture": r.architecture,
                 "recall": r.mean_recall, "precision": r.mean_precision,
                 "f1": r.mean_f1, "shared_leakage": r.mean_leakage,
+                "precision_normalized": r.mean_precision_norm,
+                "precision_ceiling": r.report_a.precision_ceiling,
                 "unmatched_a": r.report_a.unmatched, "unmatched_b": r.report_b.unmatched,
                 "n_true_a": r.report_a.n_true, "n_labelled_a": r.report_a.n_labelled,
                 "fve_a": r.fve_a, "fve_b": r.fve_b,
@@ -183,9 +185,9 @@ def _run_compare(args: argparse.Namespace) -> int:
             continue
         n = len(sel)
         print(f"  {arch:>8s}: recall={sum(r['recall'] for r in sel)/n:.3f} "
-              f"precision={sum(r['precision'] for r in sel)/n:.3f} "
-              f"f1={sum(r['f1'] for r in sel)/n:.3f} "
-              f"leakage={sum(r['shared_leakage'] for r in sel)/n:.3f}")
+              f"prec_norm={sum(r['precision_normalized'] for r in sel)/n:.3f} "
+              f"leakage={sum(r['shared_leakage'] for r in sel)/n:.3f} "
+              f"(ceiling {sel[0]['precision_ceiling']:.4f})")
 
     if args.json:
         with open(args.json, "w") as fh:
