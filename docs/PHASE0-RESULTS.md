@@ -1,5 +1,22 @@
 # Phase 0 results: the null test
 
+> **UNDER REVISION — do not cite §3, §4, §6 or §7 below.**
+>
+> Every number in this document was produced before the RNG collision fix
+> (`_DATA_SEED_OFFSET` in `diffdiff/data/toy.py`), which had initialised
+> decoders to the ground-truth concepts themselves. Corrected re-runs are in
+> progress.
+>
+> Known so far: the overcomplete null floor falls from **0.0740 to 0.0012**
+> (60x) and now PASSES, and the undercomplete floor from 0.0363 to 0.0315. The
+> two regimes rank the opposite way round from what §3.2 claims.
+>
+> **The §8 recommendation to abandon quantization is therefore under review.**
+> It rested on a 7.4% noise floor in the only regime that discriminated; the
+> real floor there is 0.12%. The detection limit in §6 was computed against a
+> floor roughly 60x too high and must be re-measured before any conclusion about
+> quantization stands.
+
 > **Pre-registration.** The reading criteria in §2 were written and committed
 > *before* the numbers came back, so that a result cannot be rationalised after
 > the fact. Numbers land in §3.
