@@ -2,9 +2,15 @@
 caches/
 artifacts/
 
-# run outputs: keep the result JSONs, drop the rest
+# run outputs: keep result JSONs, the scripts that produced them, and notes;
+# drop logs and anything else. The scripts are the record of exact
+# hyperparameters, so excluding them made the experiments unreproducible.
 runs/*
-!runs/*.json
+!runs/*/
+!runs/**/*.json
+!runs/*.sh
+!runs/**/*.md
+runs/*.log
 *.npy
 *.memmap
 *.safetensors
