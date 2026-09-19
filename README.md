@@ -20,18 +20,24 @@ and can you prove it?**
 
 ## Why this use case first
 
-Every published model-diffing result shares a weakness: no ground truth. When a
-paper reports "we found a feature for X in model B," there is no way to check
-whether that feature is real, whether it was missed, or how many were missed.
-
 Quantization and merging are model transformations where we *approximately know
-the right answer*. That makes them the only setting where the method can be
-falsified rather than merely demonstrated. See
-[`docs/DESIGN.md`](docs/DESIGN.md) § Ground truth.
+the right answer* — unlike comparing two unrelated models, where there is no way
+to check whether a reported difference is real or how many were missed.
+
+That makes them a setting where the method can be falsified rather than merely
+demonstrated, and it makes four checks cheap that the source paper does not
+report: a null test, a monotonicity test, a comparison against a black-box
+baseline, and a characterization of the near-identical regime. See
+[`docs/DESIGN.md`](docs/DESIGN.md) §3 and §6.
+
+**Known risk:** the paper reports that this method struggles on base-vs-finetune
+pairs due to "mirror features," and quantization is a more extreme version of
+that regime. This is the project's central open question and Phase 0 is designed
+to answer it cheaply — see [`docs/DESIGN.md`](docs/DESIGN.md) §11.
 
 ## Status
 
-Design stage. No implementation yet.
+Design stage. No implementation yet. Source paper read in full.
 
 | Document | Contents |
 |---|---|
