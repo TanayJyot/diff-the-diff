@@ -162,3 +162,34 @@ def test_mirror_control_flags_undersized_pool():
     report = find_mirror_pairs(model, feats)
     assert not report.control_matched
     assert "[control pool undersized]" in report.summary()
+
+
+def test_control_verdict_does_not_reuse_null_thresholds():
+    """A control run's exclusive partitions are supposed to be populated, so
+    the null's pass/fail language would invert the result."""
+    from diffdiff.validate.null import run_control_test
+
+    report = run_control_test(
+        toy=cross_arch_config(d_a=32, d_b=32, n_shared=56, n_excl=8),
+        crosscoder=CrosscoderConfig(d_a=32, d_b=32, **SMALL_CC),
+        training=TrainConfig(**SMALL_TRAIN),
+        eval_batches=2,
+        compare_standard=False,
+    )
+    assert not report.is_null
+    assert report.verdict().startswith("CONTROL")
+    assert "FAIL" not in report.verdict()
+
+
+def test_null_report_defaults_to_null_semantics():
+    from diffdiff.validate.null import run_null_test
+
+    report = run_null_test(
+        toy=null_config(d=32, n_shared=64),
+        crosscoder=CrosscoderConfig(d_a=32, d_b=32, **SMALL_CC),
+        training=TrainConfig(**SMALL_TRAIN),
+        eval_batches=2,
+        compare_standard=False,
+    )
+    assert report.is_null
+    assert not report.verdict().startswith("CONTROL")

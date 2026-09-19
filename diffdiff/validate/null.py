@@ -63,6 +63,9 @@ class NullReport:
         standard_extreme_frac: Fraction of a *standard* crosscoder's features
             with relative decoder norm outside ``[0.1, 0.9]``, i.e. what a
             practitioner would report as exclusive. ``None`` if not run.
+        is_null: Whether the inputs were identical. When false, exclusive
+            features are legitimate findings rather than false positives, and
+            the null verdict thresholds do not apply.
         seed: Seed for this run.
         history: Training metric history for the DFC.
     """
@@ -75,11 +78,23 @@ class NullReport:
     fve_b: float
     l0: float
     standard_extreme_frac: float | None = None
+    is_null: bool = True
     seed: int = 0
     history: list[dict[str, float]] = field(default_factory=list)
 
     def verdict(self) -> str:
-        """A one-line reading of whether the regime is usable."""
+        """A one-line reading of whether the regime is usable.
+
+        Only meaningful for a null run. On a control the exclusive partitions
+        are *supposed* to be populated, so the thresholds below would invert the
+        result; we report the occupancy instead and leave the comparison against
+        the paired null to the caller.
+        """
+        if not self.is_null:
+            return (
+                f"CONTROL - exclusive mass {self.exclusive_mass_frac:.4f}; "
+                "compare against the paired null, no pass/fail alone"
+            )
         if self.exclusive_mass_frac < 0.01 and self.mirror.excess < 0.05:
             return "PASS - exclusive partitions stayed essentially empty"
         if self.mirror.excess >= 0.2:
@@ -211,6 +226,7 @@ def run_regime_test(
         fve_b=final["fve_b"],
         l0=final["l0"],
         standard_extreme_frac=standard_extreme,
+        is_null=toy.is_null,
         seed=seed,
         history=history,
     )
