@@ -213,6 +213,7 @@ pass.
 | Destroyed | % of concepts | mean | range | vs null | Detectable |
 |---|---|---|---|---|---|
 | 16 (most active) | 6.3% | 0.1129 | 0.1020 – 0.1294 | **+52.6%** | **yes** |
+| 16 (mid-frequency) | 6.3% | 0.1082 | 0.0959 – 0.1203 | **+46.3%** | **yes** |
 | 8 | 3.1% | 0.0803 | 0.0674 – 0.0956 | +8.6% | no |
 | 4 | 1.6% | 0.0689 | 0.0531 – 0.0770 | −6.8% | no |
 | 2 | 0.8% | 0.0742 | 0.0634 – 0.0852 | +0.4% | no |
@@ -227,17 +228,23 @@ directions (−6.8%, +0.4%, +3.8%) with no monotone relationship to the amount o
 damage. At n=4 the control read *lower* than destroying nothing at all. The sign
 of the difference carries no information at these levels.
 
-### 6.1 These numbers are the optimistic case
+### 6.1 The limit does not depend on which concepts are destroyed
 
-Concept frequency in the toy model follows a power law in the concept index, and
-every point above destroys concepts starting at index 0 — the **most active**
-concepts in the data, the easiest possible targets. `sweep_n16_mid` repeats the
-one detectable point with the same count at mid-frequency (offset 120) to
-measure how much that choice was carrying the result.
+Concept frequency in the toy model follows a power law in the concept index, so
+destroying concepts starting at index 0 targets the **most active** concepts —
+the easiest possible case. The concern was that this made the one detectable
+point an artifact of generous target selection, and that the true limit was
+worse than 6.3%.
 
-_(That run is the last outstanding item; the table is updated when it lands. It
-can only move the limit in the unfavourable direction: if mid-frequency damage
-at n=16 fails to separate, the true limit is worse than 6.3%.)_
+`sweep_n16_mid` destroys the same number of concepts at mid frequency (offset
+120) and **separates almost as well**: +46.3% against +52.6%, clearing the null
+ceiling by a comfortable margin (min 0.0959 vs 0.0798).
+
+So the concern did not materialise. Target frequency was not carrying the
+result, and the detection limit is a robust property of the method at ~6% of
+concepts rather than an optimistic artifact. This makes the finding cleaner, and
+leaves the conclusion in §7 unchanged: 6% of a model's concepts destroyed
+outright is far more damage than quantization causes.
 
 ## 7. What this means for the quantization use case
 
