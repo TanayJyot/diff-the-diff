@@ -15,4 +15,10 @@ C="--seeds $SEEDS --d 128 --concepts 256 --k 16 --steps 1500 --batch-size 512 --
 run boundary_null null    $C
 run boundary_n8   control $C --regime dropped --n-excl 8 --noise 0.02 --drop-offset 0
 run boundary_n4   control $C --regime dropped --n-excl 4 --noise 0.02 --drop-offset 0
+# Mid-frequency arm: the corrected 3-seed data shows n=16 mid-frequency fails to
+# clear the null while n=16 high-frequency clears comfortably, so which concepts
+# are destroyed matters as much as how many. This is the decision-relevant case,
+# since compression does not preferentially damage a model's most-used concepts.
+run boundary_n16_mid control $C --regime dropped --n-excl 16 --noise 0.02 --drop-offset 120
+run boundary_n32_mid control $C --regime dropped --n-excl 32 --noise 0.02 --drop-offset 120
 echo "### ALL DONE $(date +%T)"
